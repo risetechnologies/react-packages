@@ -73,7 +73,7 @@ function areHookInputsEqual(nextDeps, prevDeps) {
 
 let uniqueCounter = 0;
 
-function useTracker(reactiveFn, deps) {
+function useTracker(reactiveFn, deps, cleanup) {
   const previousDeps = useRef();
   const computation = useRef();
   const trackerData = useRef();
@@ -85,6 +85,7 @@ function useTracker(reactiveFn, deps) {
       computation.current.stop();
       computation.current = null;
     }
+    if (cleanup) cleanup();
   };
 
   // this is called like at componentWillMount and componentWillUpdate equally
