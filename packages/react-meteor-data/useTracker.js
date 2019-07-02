@@ -78,7 +78,6 @@ function useTracker(reactiveFn, deps, cleanup) {
   const computation = useRef();
   const trackerData = useRef();
   const cleanupRef = useRef();
-  cleanupRef.current = cleanup;
 
   const [, forceUpdate] = useState();
 
@@ -134,6 +133,11 @@ function useTracker(reactiveFn, deps, cleanup) {
       })
     ));
   }
+
+  // NOTE: Make sure to set cleanupRef AFTER a possible dispose invokes the last one, because
+  // when/if deps change, we'll likely have a new cleanup method comint with it. So we want
+  // to invoke the last current one before we reset it.
+  cleanupRef.current = cleanup;
 
   // stop the computation on unmount only
   useEffect(() => {
