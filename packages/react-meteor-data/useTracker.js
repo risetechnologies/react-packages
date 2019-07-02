@@ -77,6 +77,8 @@ function useTracker(reactiveFn, deps, cleanup) {
   const previousDeps = useRef();
   const computation = useRef();
   const trackerData = useRef();
+  const cleanupRef = useRef();
+  cleanupRef.current = cleanup;
 
   const [, forceUpdate] = useState();
 
@@ -85,7 +87,9 @@ function useTracker(reactiveFn, deps, cleanup) {
       computation.current.stop();
       computation.current = null;
     }
-    if (cleanup) cleanup();
+    if (cleanupRef.current) {
+      cleanupRef.current();
+    }
   };
 
   // this is called like at componentWillMount and componentWillUpdate equally
