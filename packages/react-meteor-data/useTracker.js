@@ -73,10 +73,11 @@ function areHookInputsEqual(nextDeps, prevDeps) {
 
 let uniqueCounter = 0;
 
-function useTracker(reactiveFn, deps) {
+function useTracker(reactiveFn, deps, cleanup) {
   const previousDeps = useRef();
   const computation = useRef();
   const trackerData = useRef();
+  const cleanupRef = useRef();
 
   const [, forceUpdate] = useState();
 
@@ -84,6 +85,9 @@ function useTracker(reactiveFn, deps) {
     if (computation.current) {
       computation.current.stop();
       computation.current = null;
+    }
+    if (cleanupRef.current) {
+      cleanupRef.current();
     }
   };
 
@@ -118,6 +122,11 @@ function useTracker(reactiveFn, deps) {
       })
     ));
   }
+
+  // NOTE: Make sure to set cleanupRef AFTER a possible dispose invokes the last one, because
+  // when/if deps change, we'll likely have a new cleanup method comint with it. So we want
+  // to invoke the last current one before we reset it.
+  cleanupRef.current = cleanup;
 
   // stop the computation on unmount only
   useEffect(() => {
