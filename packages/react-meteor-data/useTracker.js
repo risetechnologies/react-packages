@@ -87,11 +87,25 @@ function useTracker(reactiveFn, deps) {
     }
   };
 
-  // this is called like at componentWillMount and componentWillUpdate equally
-  // in order to support render calls with synchronous data from the reactive computation
-  // if prevDeps or deps are not set areHookInputsEqual always returns false
-  // and the reactive functions is always called
-  if (!areHookInputsEqual(deps, refs.previousDeps)) {
+  if (!refs.didMount) {
+    // No side-effects are allowed when computing the initial value.
+    // To get the initial return value for the 1st render on mount,
+    // we run reactiveFn without autorun or subscriptions.
+    // Note: maybe when React Suspense is officially available we could
+    // throw a Promise instead to skip the 1st render altogether ?
+    const realSubscribe = Meteor.subscribe;
+    Meteor.subscribe = () => ({ stop: () => {}, ready: () => false });
+    Tracker.nonreactive(() => {
+      const data = reactiveFn();
+      if (Meteor.isDevelopment) checkCursor(data);
+      refs.trackerData = data;
+    });
+    Meteor.subscribe = realSubscribe;
+  } else if (!areHookInputsEqual(deps, refs.previousDeps)) {
+    // this is called like at componentWillMount and componentWillUpdate equally
+    // in order to support render calls with synchronous data from the reactive computation
+    // if prevDeps or deps are not set areHookInputsEqual always returns false
+    // and the reactive functions is always called
     // if we are re-creating the computation, we need to stop the old one.
     dispose();
 
@@ -130,6 +144,7 @@ function useTracker(reactiveFn, deps) {
 
   // stop the computation on unmount only
   useEffect(() => {
+    refs.didMount = true;
     if (Meteor.isDevelopment
       && deps !== null && deps !== undefined
       && !Array.isArray(deps)) {
