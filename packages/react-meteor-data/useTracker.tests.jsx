@@ -1,23 +1,31 @@
-/* global Tinytest */
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-
 import { renderHook, act } from '@testing-library/react-hooks';
-import { ReactiveDict } from 'meteor/reactive-dict';
+
+/* eslint-disable import/no-unresolved */
+import { Meteor } from 'meteor/meteor';
+import { Mongo } from 'meteor/mongo';
+import { _ } from 'meteor/underscore';
 import { ReactiveVar } from 'meteor/reactive-var';
+import { ReactiveDict } from 'meteor/reactive-dict';
+import { Tinytest } from 'meteor/tinytest';
+import { canonicalizeHtml, testAsyncMulti } from 'meteor/test-helpers';
+import { Tracker } from 'meteor/tracker';
+/* eslint-enable import/no-unresolved */
 
 import useTracker from './useTracker';
 
-Tinytest.add('useTracker - no deps', async function (test) {
+Tinytest.add('useTracker - no deps', async (test) => {
   const reactiveDict = new ReactiveDict();
   let runCount = 0;
 
   const { result, rerender, unmount, waitForNextUpdate } = renderHook(
-    ({ name }) => useTracker(() => {
-      runCount++;
-      reactiveDict.setDefault(name, 'initial');
-      return reactiveDict.get(name);
-    }),
+    ({ name }) =>
+      useTracker(() => {
+        runCount += 1;
+        reactiveDict.setDefault(name, 'initial');
+        return reactiveDict.get(name);
+      }),
     { initialProps: { name: 'key' } }
   );
 
@@ -26,7 +34,7 @@ Tinytest.add('useTracker - no deps', async function (test) {
 
   act(() => {
     reactiveDict.set('key', 'changed');
-    Tracker.flush({_throwFirstError: true});
+    Tracker.flush({ _throwFirstError: true });
   });
   await waitForNextUpdate();
 
@@ -36,13 +44,21 @@ Tinytest.add('useTracker - no deps', async function (test) {
   rerender();
   await waitForNextUpdate();
 
-  test.equal(result.current, 'changed', 'Expect value of "changed" to persist after rerender');
+  test.equal(
+    result.current,
+    'changed',
+    'Expect value of "changed" to persist after rerender'
+  );
   test.equal(runCount, 3, 'Should have run 3 times');
 
   rerender({ name: 'different' });
   await waitForNextUpdate();
 
-  test.equal(result.current, 'default', 'After deps change, the default value should have returned');
+  test.equal(
+    result.current,
+    'default',
+    'After deps change, the default value should have returned'
+  );
   test.equal(runCount, 4, 'Should have run 4 times');
 
   unmount();
@@ -50,51 +66,76 @@ Tinytest.add('useTracker - no deps', async function (test) {
 
   act(() => {
     reactiveDict.set('different', 'changed again');
-    Tracker.flush({_throwFirstError: true});
+    Tracker.flush({ _throwFirstError: true });
   });
   // we can't use await waitForNextUpdate() here because it doesn't trigger re-render - is there a way to test that?
 
-  test.equal(result.current, 'default', 'After unmount, changes to the reactive source should not update the value.');
-  test.equal(runCount, 4, 'After unmount, useTracker should no longer be tracking');
+  test.equal(
+    result.current,
+    'default',
+    'After unmount, changes to the reactive source should not update the value.'
+  );
+  test.equal(
+    runCount,
+    4,
+    'After unmount, useTracker should no longer be tracking'
+  );
 
   reactiveDict.destroy();
 });
 
-Tinytest.add('useTracker - with deps', async function (test) {
+Tinytest.add('useTracker - with deps', async (test) => {
   const reactiveDict = new ReactiveDict();
   let runCount = 0;
 
   const { result, rerender, unmount, waitForNextUpdate } = renderHook(
-    ({ name }) => useTracker(() => {
-      runCount++;
-      reactiveDict.setDefault(name, 'default');
-      return reactiveDict.get(name);
-    }, [name]),
+    ({ name }) =>
+      useTracker(() => {
+        runCount += 1;
+        reactiveDict.setDefault(name, 'default');
+        return reactiveDict.get(name);
+      }, [name]),
     { initialProps: { name: 'name' } }
   );
 
-  test.equal(result.current, 'default', 'Expect the default value for given name to be "default"');
+  test.equal(
+    result.current,
+    'default',
+    'Expect the default value for given name to be "default"'
+  );
   test.equal(runCount, 1, 'Should have run 1 times');
 
   act(() => {
     reactiveDict.set('name', 'changed');
-    Tracker.flush({_throwFirstError: true});
+    Tracker.flush({ _throwFirstError: true });
   });
   await waitForNextUpdate();
 
-  test.equal(result.current, 'changed', 'Expect the new value for given name to be "changed"');
+  test.equal(
+    result.current,
+    'changed',
+    'Expect the new value for given name to be "changed"'
+  );
   test.equal(runCount, 2, 'Should have run 2 times');
 
   rerender();
   await waitForNextUpdate();
 
-  test.equal(result.current, 'changed', 'Expect the new value "changed" for given name to have persisted through render');
+  test.equal(
+    result.current,
+    'changed',
+    'Expect the new value "changed" for given name to have persisted through render'
+  );
   test.equal(runCount, 3, 'Should have run 3 times');
 
   rerender({ name: 'different' });
   await waitForNextUpdate();
 
-  test.equal(result.current, 'default', 'After deps change, the default value should have returned');
+  test.equal(
+    result.current,
+    'default',
+    'After deps change, the default value should have returned'
+  );
   test.equal(runCount, 4, 'Should have run 4 times');
 
   unmount();
@@ -103,40 +144,48 @@ Tinytest.add('useTracker - with deps', async function (test) {
 
   act(() => {
     reactiveDict.set('different', 'changed again');
-    Tracker.flush({_throwFirstError: true});
+    Tracker.flush({ _throwFirstError: true });
   });
 
-  test.equal(result.current, 'default', 'After unmount, changes to the reactive source should not update the value.');
-  test.equal(runCount, 4, 'After unmount, useTracker should no longer be tracking');
+  test.equal(
+    result.current,
+    'default',
+    'After unmount, changes to the reactive source should not update the value.'
+  );
+  test.equal(
+    runCount,
+    4,
+    'After unmount, useTracker should no longer be tracking'
+  );
 
   reactiveDict.destroy();
 });
 
-const getInnerHtml = function (elem) {
+const getInnerHtml = (elem) => {
   // clean up elem.innerHTML and strip data-reactid attributes too
   return canonicalizeHtml(elem.innerHTML).replace(/ data-reactroot=".*?"/g, '');
 };
 
 if (Meteor.isClient) {
-  Tinytest.add('useTracker - basic track', function (test) {
-    var div = document.createElement("DIV");
+  Tinytest.add('useTracker - basic track', (test) => {
+    const div = document.createElement('DIV');
 
-    var x = new ReactiveVar('aaa');
+    const x = new ReactiveVar('aaa');
 
-    var Foo = () => {
+    const Foo = () => {
       const data = useTracker(() => {
         return {
-          x: x.get()
+          x: x.get(),
         };
-      })
+      });
       return <span>{data.x}</span>;
     };
 
-    ReactDOM.render(<Foo/>, div);
+    ReactDOM.render(<Foo />, div);
     test.equal(getInnerHtml(div), '<span>aaa</span>');
 
     x.set('bbb');
-    Tracker.flush({_throwFirstError: true});
+    Tracker.flush({ _throwFirstError: true });
     test.equal(getInnerHtml(div), '<span>bbb</span>');
 
     test.equal(x._numListeners(), 1);
@@ -151,48 +200,50 @@ if (Meteor.isClient) {
   // nested, invalidating the outer one stops the inner one, unless
   // Tracker.nonreactive is used.  This test tests for the use of
   // Tracker.nonreactive around the mixin's autorun.
-  Tinytest.add('useTracker - render in autorun', function (test) {
-    var div = document.createElement("DIV");
+  Tinytest.add('useTracker - render in autorun', (test) => {
+    const div = document.createElement('DIV');
 
-    var x = new ReactiveVar('aaa');
+    const x = new ReactiveVar('aaa');
 
-    var Foo = () => {
+    const Foo = () => {
       const data = useTracker(() => {
         return {
-          x: x.get()
+          x: x.get(),
         };
       });
       return <span>{data.x}</span>;
     };
 
-    Tracker.autorun(function (c) {
-      ReactDOM.render(<Foo/>, div);
+    Tracker.autorun((c) => {
+      ReactDOM.render(<Foo />, div);
       // Stopping this autorun should not affect the mixin's autorun.
       c.stop();
     });
     test.equal(getInnerHtml(div), '<span>aaa</span>');
 
     x.set('bbb');
-    Tracker.flush({_throwFirstError: true});
+    Tracker.flush({ _throwFirstError: true });
     test.equal(getInnerHtml(div), '<span>bbb</span>');
 
     ReactDOM.unmountComponentAtNode(div);
   });
 
-  Tinytest.add('useTracker - track based on props and state', function (test) {
-    var div = document.createElement("DIV");
+  Tinytest.add('useTracker - track based on props and state', (test) => {
+    const div = document.createElement('DIV');
 
-    var xs = [new ReactiveVar('aaa'),
-              new ReactiveVar('bbb'),
-              new ReactiveVar('ccc')];
+    const xs = [
+      new ReactiveVar('aaa'),
+      new ReactiveVar('bbb'),
+      new ReactiveVar('ccc'),
+    ];
 
     let setState;
-    var Foo = (props) => {
+    const Foo = ({ n }) => {
       const [state, _setState] = useState({ m: 0 });
       setState = _setState;
       const data = useTracker(() => {
         return {
-          x: xs[state.m + props.n].get()
+          x: xs[state.m + n].get(),
         };
       });
       return <span>{data.x}</span>;
@@ -203,7 +254,7 @@ if (Meteor.isClient) {
     test.equal(getInnerHtml(div), '<span>aaa</span>');
     xs[0].set('AAA');
     test.equal(getInnerHtml(div), '<span>aaa</span>');
-    Tracker.flush({_throwFirstError: true});
+    Tracker.flush({ _throwFirstError: true });
     test.equal(getInnerHtml(div), '<span>AAA</span>');
 
     const comp2 = ReactDOM.render(<Foo n={1} />, div);
@@ -211,74 +262,77 @@ if (Meteor.isClient) {
 
     test.equal(getInnerHtml(div), '<span>bbb</span>');
     xs[1].set('BBB');
-    Tracker.flush({_throwFirstError: true});
+    Tracker.flush({ _throwFirstError: true });
     test.equal(getInnerHtml(div), '<span>BBB</span>');
 
-    setState({m: 1});
+    setState({ m: 1 });
     test.equal(getInnerHtml(div), '<span>ccc</span>');
     xs[2].set('CCC');
-    Tracker.flush({_throwFirstError: true});
+    Tracker.flush({ _throwFirstError: true });
     test.equal(getInnerHtml(div), '<span>CCC</span>');
 
-    ReactDOM.render(<Foo n={0}/>, div);
-    setState({m: 0});
+    ReactDOM.render(<Foo n={0} />, div);
+    setState({ m: 0 });
     test.equal(getInnerHtml(div), '<span>AAA</span>');
 
     ReactDOM.unmountComponentAtNode(div);
   });
 
-  Tinytest.add('useTracker - track based on props and state (with deps)', function (test) {
-    var div = document.createElement("DIV");
+  Tinytest.add(
+    'useTracker - track based on props and state (with deps)',
+    (test) => {
+      const div = document.createElement('DIV');
 
-    var xs = [new ReactiveVar('aaa'),
-              new ReactiveVar('bbb'),
-              new ReactiveVar('ccc')];
+      const xs = [
+        new ReactiveVar('aaa'),
+        new ReactiveVar('bbb'),
+        new ReactiveVar('ccc'),
+      ];
 
-    let setState;
-    var Foo = (props) => {
-      const [state, _setState] = useState({ m: 0 });
-      setState = _setState;
-      const data = useTracker(() => {
-        return {
-          x: xs[state.m + props.n].get()
-        };
-      }, [state.m, props.n]);
-      return <span>{data.x}</span>;
-    };
+      let setState;
+      const Foo = ({ n }) => {
+        const [state, _setState] = useState({ m: 0 });
+        setState = _setState;
+        const data = useTracker(() => {
+          return {
+            x: xs[state.m + n].get(),
+          };
+        }, [state.m, n]);
+        return <span>{data.x}</span>;
+      };
 
-    var comp = ReactDOM.render(<Foo n={0}/>, div);
+      const comp = ReactDOM.render(<Foo n={0} />, div);
 
-    test.equal(getInnerHtml(div), '<span>aaa</span>');
-    xs[0].set('AAA');
-    test.equal(getInnerHtml(div), '<span>aaa</span>');
-    Tracker.flush({_throwFirstError: true});
-    test.equal(getInnerHtml(div), '<span>AAA</span>');
+      test.equal(getInnerHtml(div), '<span>aaa</span>');
+      xs[0].set('AAA');
+      test.equal(getInnerHtml(div), '<span>AAA</span>');
+      Tracker.flush({ _throwFirstError: true });
+      test.equal(getInnerHtml(div), '<span>AAA</span>');
 
-    {
-      let comp2 = ReactDOM.render(<Foo n={1}/>, div);
+      const comp2 = ReactDOM.render(<Foo n={1} />, div);
       test.isTrue(comp === comp2);
+
+      test.equal(getInnerHtml(div), '<span>bbb</span>');
+      xs[1].set('BBB');
+      Tracker.flush({ _throwFirstError: true });
+      test.equal(getInnerHtml(div), '<span>BBB</span>');
+
+      setState({ m: 1 });
+      test.equal(getInnerHtml(div), '<span>ccc</span>');
+      xs[2].set('CCC');
+      Tracker.flush({ _throwFirstError: true });
+      test.equal(getInnerHtml(div), '<span>CCC</span>');
+
+      ReactDOM.render(<Foo n={0} />, div);
+      setState({ m: 0 });
+      test.equal(getInnerHtml(div), '<span>AAA</span>');
+
+      ReactDOM.unmountComponentAtNode(div);
     }
+  );
 
-    test.equal(getInnerHtml(div), '<span>bbb</span>');
-    xs[1].set('BBB');
-    Tracker.flush({_throwFirstError: true});
-    test.equal(getInnerHtml(div), '<span>BBB</span>');
-
-    setState({m: 1});
-    test.equal(getInnerHtml(div), '<span>ccc</span>');
-    xs[2].set('CCC');
-    Tracker.flush({_throwFirstError: true});
-    test.equal(getInnerHtml(div), '<span>CCC</span>');
-
-    ReactDOM.render(<Foo n={0}/>, div);
-    setState({m: 0});
-    test.equal(getInnerHtml(div), '<span>AAA</span>');
-
-    ReactDOM.unmountComponentAtNode(div);
-  });
-
-  function waitFor(func, callback) {
-    Tracker.autorun(function (c) {
+  const waitFor = (func, callback) => {
+    Tracker.autorun((c) => {
       if (func()) {
         c.stop();
         callback();
@@ -287,41 +341,45 @@ if (Meteor.isClient) {
   };
 
   testAsyncMulti('useTracker - resubscribe', [
-    function (test, expect) {
-      var self = this;
-      self.div = document.createElement("DIV");
-      self.collection = new Mongo.Collection("useTracker-mixin-coll");
+    (test, expect) => {
+      const self = this;
+      self.div = document.createElement('DIV');
+      self.collection = new Mongo.Collection('useTracker-mixin-coll');
       self.num = new ReactiveVar(1);
       self.someOtherVar = new ReactiveVar('foo');
       self.Foo = () => {
         // eslint-disable-next-line react-hooks/rules-of-hooks
         const data = useTracker(() => {
-          self.handle =
-            Meteor.subscribe("useTracker-mixin-sub",
-                             self.num.get());
+          self.handle = Meteor.subscribe(
+            'useTracker-mixin-sub',
+            self.num.get()
+          );
 
           return {
             v: self.someOtherVar.get(),
-            docs: self.collection.find().fetch()
+            docs: self.collection.find().fetch(),
           };
         });
         self.data = data;
-        return <div>{
-          _.map(data.docs, (doc) => <span key={doc._id}>{doc._id}</span>)
-        }</div>;
+        return (
+          <div>
+            {_.map(data.docs, (doc) => (
+              <span key={doc._id}>{doc._id}</span>
+            ))}
+          </div>
+        );
       };
 
-      self.component = ReactDOM.render(<self.Foo/>, self.div);
+      self.component = ReactDOM.render(<self.Foo />, self.div);
       test.equal(getInnerHtml(self.div), '<div></div>');
 
-      var handle = self.handle;
+      const { handle } = self;
       test.isFalse(handle.ready());
 
-      waitFor(() => handle.ready(),
-              expect());
+      waitFor(() => handle.ready(), expect());
     },
-    function (test, expect) {
-      var self = this;
+    (test, expect) => {
+      const self = this;
       test.isTrue(self.handle.ready());
       test.equal(getInnerHtml(self.div), '<div><span>id1</span></div>');
 
@@ -331,10 +389,10 @@ if (Meteor.isClient) {
       // can't call Tracker.flush() here (we are in a Tracker.flush already)
       Tracker.afterFlush(expect());
     },
-    function (test, expect) {
-      var self = this;
-      var oldHandle = self.oldHandle1;
-      var newHandle = self.handle;
+    (test, expect) => {
+      const self = this;
+      const oldHandle = self.oldHandle1;
+      const newHandle = self.handle;
       test.notEqual(oldHandle, newHandle); // new handle
       test.equal(newHandle.subscriptionId, oldHandle.subscriptionId); // same sub
       test.isTrue(newHandle.ready()); // doesn't become unready
@@ -346,50 +404,50 @@ if (Meteor.isClient) {
       self.oldHandle2 = newHandle;
       Tracker.afterFlush(expect());
     },
-    function (test, expect) {
-      var self = this;
+    (test, expect) => {
+      const self = this;
       // data is still there
       test.equal(getInnerHtml(self.div), '<div><span>id1</span></div>');
       // handle is no longer ready
-      var handle = self.handle;
+      const { handle } = self;
       test.isFalse(handle.ready());
       // different sub ID
       test.isTrue(self.oldHandle2.subscriptionId);
       test.isTrue(handle.subscriptionId);
       test.notEqual(handle.subscriptionId, self.oldHandle2.subscriptionId);
 
-      waitFor(() => handle.ready(),
-              expect());
+      waitFor(() => handle.ready(), expect());
     },
-    function (test, expect) {
-      var self = this;
+    (test, expect) => {
+      const self = this;
       // now we see the new data! (and maybe the old data, because
       // when a subscription goes away, its data doesn't disappear right
       // away; the server has to tell the client which documents or which
       // properties to remove, and this is not easy to wait for either; see
       // https://github.com/meteor/meteor/issues/2440)
-      test.equal(getInnerHtml(self.div).replace('<span>id1</span>', ''),
-                 '<div><span>id2</span></div>');
+      test.equal(
+        getInnerHtml(self.div).replace('<span>id1</span>', ''),
+        '<div><span>id2</span></div>'
+      );
 
       self.someOtherVar.set('baz');
       self.oldHandle3 = self.handle;
 
       Tracker.afterFlush(expect());
     },
-    function (test, expect) {
-      var self = this;
+    (test) => {
+      const self = this;
       test.equal(self.data.v, 'baz');
       test.notEqual(self.oldHandle3, self.handle);
-      test.equal(self.oldHandle3.subscriptionId,
-                 self.handle.subscriptionId);
+      test.equal(self.oldHandle3.subscriptionId, self.handle.subscriptionId);
       test.isTrue(self.handle.ready());
     },
-    function (test, expect) {
+    (test, expect) => {
       ReactDOM.unmountComponentAtNode(this.div);
       // break out of flush time, so we don't call the test's
       // onComplete from within Tracker.flush
       Meteor.defer(expect());
-    }
+    },
   ]);
 
   // Tinytest.add(
@@ -423,11 +481,11 @@ if (Meteor.isClient) {
   //       console.warn = oldWarn;
   //     }
   //   });
-
 } else {
-  Meteor.publish("useTracker-mixin-sub", function (num) {
-    Meteor.defer(() => {  // because subs are blocking
-      this.added("useTracker-mixin-coll", 'id'+num, {});
+  Meteor.publish('useTracker-mixin-sub', function useTrackerMixinSub(num) {
+    Meteor.defer(() => {
+      // because subs are blocking
+      this.added('useTracker-mixin-coll', `id${num}`, {});
       this.ready();
     });
   });

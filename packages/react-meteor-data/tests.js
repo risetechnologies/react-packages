@@ -1,2 +1,2 @@
-import './useTracker.tests.js';
-import './withTracker.tests.js';
+import './useTracker.tests';
+import './withTracker.tests';
