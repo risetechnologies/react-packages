@@ -1,10 +1,10 @@
 /* global Package */ // Todo: Where to import this from?
 Package.describe({
-  name: 'react-meteor-data',
+  name: 'risetechnologies:react-meteor-data',
   summary: 'React higher-order component for reactively tracking Meteor data',
-  version: '0.2.16',
+  version: '0.1.0',
   documentation: 'README.md',
-  git: 'https://github.com/meteor/react-packages',
+  git: 'https://github.com/risetechnologies/react-packages',
 });
 
 Package.onUse(function onUse(api) {
