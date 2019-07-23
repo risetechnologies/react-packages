@@ -2,6 +2,7 @@
 import React, { useReducer, useEffect, useRef } from 'react';
 
 // Use React.warn() if available (should ship in React 16.9).
+// eslint-disable-next-line no-console
 const warn = React.warn || console.warn.bind(console);
 
 // Warns if data is a Mongo.Cursor or a POJO containing a Mongo.Cursor.
@@ -36,6 +37,49 @@ function is(x, y) {
   );
 }
 
+// taken from https://github.com/facebook/react/blob/
+// a9b035b0c2b8235405835beca0c4db2cc37f18d0/packages/shared/shallowEqual.js
+/**
+ * Performs equality by iterating through keys on an object and returning false
+ * when any key has values which are not strictly equal between the arguments.
+ * Returns true when the values of all keys are strictly equal.
+ */
+function shallowEqual(objA, objB) {
+  if (is(objA, objB)) {
+    return true;
+  }
+
+  if (
+    typeof objA !== 'object' ||
+    objA === null ||
+    typeof objB !== 'object' ||
+    objB === null
+  ) {
+    return false;
+  }
+
+  const keysA = Object.keys(objA);
+  const keysB = Object.keys(objB);
+
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+
+  // Test for A's keys different from B.
+  for (let i = 0; i < keysA.length; i++) {
+    if (
+      !Object.prototype.hasOwnProperty.call(objB, keysA[i]) ||
+      !is(objA[keysA[i]], objB[keysA[i]])
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+const areDepsValid = (deps) => deps !== null && deps !== undefined && !Array.isArray(deps);
+
 // inspired by https://github.com/facebook/react/blob/
 // 34ce57ae751e0952fd12ab532a3e5694445897ea/packages/
 // react-reconciler/src/ReactFiberHooks.js#L307-L354
@@ -46,8 +90,8 @@ function areHookInputsEqual(nextDeps, prevDeps) {
     return false;
   }
 
-  if (!Array.isArray(nextDeps)) {
-    if (Meteor.isDevelopment) {
+  if (nextDeps === null || nextDeps === undefined || !Array.isArray(nextDeps)) {
+    if (Meteor.isDevelopment && !areDepsValid(nextDeps)) {
       warn(
         'Warning: useTracker expected an dependency value of '
         + `type array but got type of ${typeof nextDeps} instead.`
@@ -63,7 +107,7 @@ function areHookInputsEqual(nextDeps, prevDeps) {
   }
 
   for (let i = 0; i < len; i++) {
-    if (!is(nextDeps[i], prevDeps[i])) {
+    if (!shallowEqual(nextDeps[i], prevDeps[i])) {
       return false;
     }
   }
@@ -117,8 +161,7 @@ function useTracker(reactiveFn, deps) {
           runReactiveFn();
         } else {
           // If deps are falsy, stop computation and let next render handle reactiveFn.
-          if (refs.previousDeps !== null && refs.previousDeps !== undefined
-            && !Array.isArray(refs.previousDeps)) {
+          if (!areDepsValid(deps)) {
             dispose();
           } else {
             runReactiveFn();
@@ -131,9 +174,7 @@ function useTracker(reactiveFn, deps) {
 
   // stop the computation on unmount only
   useEffect(() => {
-    if (Meteor.isDevelopment
-      && deps !== null && deps !== undefined
-      && !Array.isArray(deps)) {
+    if (Meteor.isDevelopment && !areDepsValid(deps)) {
       warn(
         'Warning: useTracker expected an initial dependency value of '
         + `type array but got type of ${typeof deps} instead.`
