@@ -12,7 +12,8 @@ Package.onUse(function onUse(api) {
   api.use('tracker');
   api.use('ecmascript');
 
-  api.mainModule('index.js');
+  api.mainModule('index.client.js', 'client');
+  api.mainModule('index.server.js', 'server');
 });
 
 Package.onTest(function onTest(api) {

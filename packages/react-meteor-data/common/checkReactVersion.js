@@ -8,6 +8,3 @@ if (Meteor.isDevelopment) {
     console.warn('react-meteor-data 2.x requires React version >= 16.8.');
   }
 }
-
-export { default as withTracker } from './withTracker';
-export { default as useTracker } from './useTracker';

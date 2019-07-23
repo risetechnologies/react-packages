@@ -87,7 +87,7 @@ function shallowEqual(objA, objB) {
 }
 
 const areDepsValid = (deps) =>
-  deps !== null && deps !== undefined && !Array.isArray(deps);
+  deps === null || deps === undefined || Array.isArray(deps);
 
 // inspired by https://github.com/facebook/react/blob/
 // 34ce57ae751e0952fd12ab532a3e5694445897ea/packages/
@@ -128,8 +128,8 @@ function areHookInputsEqual(nextDeps, prevDeps) {
 // incrementing a number whenever the dispatch method is invoked.
 const fur = (x) => x + 1;
 
-function useTracker(reactiveFn, deps) {
-  const { current: refs } = useRef({});
+export const useControlledTracker = (reactiveFn, deps) => {
+  const { current: refs } = useRef({ status: 1 });
 
   const [, forceUpdate] = useReducer(fur, 0);
 
@@ -140,11 +140,41 @@ function useTracker(reactiveFn, deps) {
     }
   };
 
+  /*
+  Status can be
+  -1: stopped, computation is stopped, dep change won't create a new computation
+  0: paused, computation is stopped, dep change will create a new computation
+  1: running, computation is running, dep change will create a new computation
+  */
+  const handle = {
+    status: () => refs.status,
+    stop: () => {
+      if (refs.status >= 0) {
+        refs.status = -1;
+        dispose();
+      }
+    },
+    pause: () => {
+      if (refs.status === 1) {
+        refs.status = 0;
+        dispose();
+      }
+    },
+    resume: () => {
+      if (refs.status <= 1) {
+        refs.status = 1;
+        dispose();
+        refs.previousDeps = null;
+        forceUpdate();
+      }
+    },
+  };
+
   // this is called like at componentWillMount and componentWillUpdate equally
   // in order to support render calls with synchronous data from the reactive computation
   // if prevDeps or deps are not set areHookInputsEqual always returns false
   // and the reactive functions is always called
-  if (!areHookInputsEqual(deps, refs.previousDeps)) {
+  if (refs.status >= 0 && !areHookInputsEqual(deps, refs.previousDeps)) {
     // if we are re-creating the computation, we need to stop the old one.
     dispose();
 
@@ -159,7 +189,7 @@ function useTracker(reactiveFn, deps) {
     refs.computation = Tracker.nonreactive(() =>
       Tracker.autorun((c) => {
         const runReactiveFn = () => {
-          const data = reactiveFn();
+          const data = reactiveFn(handle);
           if (Meteor.isDevelopment) checkCursor(data);
           refs.trackerData = data;
         };
@@ -194,13 +224,7 @@ function useTracker(reactiveFn, deps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return refs.trackerData;
-}
+  return [refs.trackerData, handle];
+};
 
-// When rendering on the server, we don't want to use the Tracker.
-// We only do the first rendering on the server so we can get the data right away
-function useTrackerServer(reactiveFn) {
-  return reactiveFn();
-}
-
-export default Meteor.isServer ? useTrackerServer : useTracker;
+export default (reactiveFn, deps) => useControlledTracker(reactiveFn, deps)[0];
