@@ -1,5 +1,9 @@
-/* global Meteor, Package, Tracker */
+/* global Package */ // Todo: Where to import this from?
 import React, { useReducer, useEffect, useRef } from 'react';
+/* eslint-disable import/no-unresolved */
+import { Tracker } from 'meteor/tracker';
+import { Meteor } from 'meteor/meteor';
+/* eslint-enable import/no-unresolved */
 
 // Use React.warn() if available (should ship in React 16.9).
 // eslint-disable-next-line no-console
@@ -8,7 +12,12 @@ const warn = React.warn || console.warn.bind(console);
 // Warns if data is a Mongo.Cursor or a POJO containing a Mongo.Cursor.
 function checkCursor(data) {
   let shouldWarn = false;
-  if (Package.mongo && Package.mongo.Mongo && data && typeof data === 'object') {
+  if (
+    Package.mongo &&
+    Package.mongo.Mongo &&
+    data &&
+    typeof data === 'object'
+  ) {
     if (data instanceof Package.mongo.Mongo.Cursor) {
       shouldWarn = true;
     } else if (Object.getPrototypeOf(data) === Object.prototype) {
@@ -21,9 +30,9 @@ function checkCursor(data) {
   }
   if (shouldWarn) {
     warn(
-      'Warning: your reactive function is returning a Mongo cursor. '
-      + 'This value will not be reactive. You probably want to call '
-      + '`.fetch()` on the cursor before returning it.'
+      'Warning: your reactive function is returning a Mongo cursor. ' +
+        'This value will not be reactive. You probably want to call ' +
+        '`.fetch()` on the cursor before returning it.'
     );
   }
 }
@@ -32,8 +41,7 @@ function checkCursor(data) {
 // 34ce57ae751e0952fd12ab532a3e5694445897ea/packages/shared/objectIs.js
 function is(x, y) {
   return (
-    (x === y && (x !== 0 || 1 / x === 1 / y))
-    || (x !== x && y !== y) // eslint-disable-line no-self-compare
+    (x === y && (x !== 0 || 1 / x === 1 / y)) || (x !== x && y !== y) // eslint-disable-line no-self-compare
   );
 }
 
@@ -78,7 +86,8 @@ function shallowEqual(objA, objB) {
   return true;
 }
 
-const areDepsValid = (deps) => deps !== null && deps !== undefined && !Array.isArray(deps);
+const areDepsValid = (deps) =>
+  deps !== null && deps !== undefined && !Array.isArray(deps);
 
 // inspired by https://github.com/facebook/react/blob/
 // 34ce57ae751e0952fd12ab532a3e5694445897ea/packages/
@@ -93,8 +102,8 @@ function areHookInputsEqual(nextDeps, prevDeps) {
   if (nextDeps === null || nextDeps === undefined || !Array.isArray(nextDeps)) {
     if (Meteor.isDevelopment && !areDepsValid(nextDeps)) {
       warn(
-        'Warning: useTracker expected an dependency value of '
-        + `type array but got type of ${typeof nextDeps} instead.`
+        'Warning: useTracker expected an dependency value of ' +
+          `type array but got type of ${typeof nextDeps} instead.`
       );
     }
     return false;
@@ -117,7 +126,7 @@ function areHookInputsEqual(nextDeps, prevDeps) {
 
 // Used to create a forceUpdate from useReducer. Forces update by
 // incrementing a number whenever the dispatch method is invoked.
-const fur = x => x + 1;
+const fur = (x) => x + 1;
 
 function useTracker(reactiveFn, deps) {
   const { current: refs } = useRef({});
@@ -147,7 +156,7 @@ function useTracker(reactiveFn, deps) {
     // In that case, we want to opt out of the normal behavior of nested
     // Computations, where if the outer one is invalidated or stopped,
     // it stops the inner one.
-    refs.computation = Tracker.nonreactive(() => (
+    refs.computation = Tracker.nonreactive(() =>
       Tracker.autorun((c) => {
         const runReactiveFn = () => {
           const data = reactiveFn();
@@ -169,19 +178,20 @@ function useTracker(reactiveFn, deps) {
           forceUpdate();
         }
       })
-    ));
+    );
   }
 
   // stop the computation on unmount only
   useEffect(() => {
     if (Meteor.isDevelopment && !areDepsValid(deps)) {
       warn(
-        'Warning: useTracker expected an initial dependency value of '
-        + `type array but got type of ${typeof deps} instead.`
+        'Warning: useTracker expected an initial dependency value of ' +
+          `type array but got type of ${typeof deps} instead.`
       );
     }
 
     return dispose;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return refs.trackerData;
@@ -193,4 +203,4 @@ function useTrackerServer(reactiveFn) {
   return reactiveFn();
 }
 
-export default (Meteor.isServer ? useTrackerServer : useTracker);
+export default Meteor.isServer ? useTrackerServer : useTracker;

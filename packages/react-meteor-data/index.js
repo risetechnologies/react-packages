@@ -1,4 +1,4 @@
-/* global Meteor*/
+/* global Meteor */
 import React from 'react';
 
 if (Meteor.isDevelopment) {
@@ -9,5 +9,5 @@ if (Meteor.isDevelopment) {
   }
 }
 
-export { default as withTracker } from './withTracker.jsx';
-export { default as useTracker } from './useTracker.js';
+export { default as withTracker } from './withTracker';
+export { default as useTracker } from './useTracker';

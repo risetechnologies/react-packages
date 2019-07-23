@@ -1,5 +1,4 @@
-/* global Package */
-
+/* global Package */ // Todo: Where to import this from?
 Package.describe({
   name: 'react-meteor-data',
   summary: 'React higher-order component for reactively tracking Meteor data',
@@ -8,7 +7,7 @@ Package.describe({
   git: 'https://github.com/meteor/react-packages',
 });
 
-Package.onUse((api) => {
+Package.onUse(function onUse(api) {
   api.versionsFrom('1.3');
   api.use('tracker');
   api.use('ecmascript');
@@ -16,7 +15,7 @@ Package.onUse((api) => {
   api.mainModule('index.js');
 });
 
-Package.onTest((api) => {
+Package.onTest(function onTest(api) {
   api.use([
     'ecmascript',
     'reactive-dict',

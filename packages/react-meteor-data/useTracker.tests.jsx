@@ -198,7 +198,7 @@ if (Meteor.isClient) {
       return <span>{data.x}</span>;
     };
 
-    var comp = ReactDOM.render(<Foo n={0}/>, div);
+    const comp = ReactDOM.render(<Foo n={0} />, div);
 
     test.equal(getInnerHtml(div), '<span>aaa</span>');
     xs[0].set('AAA');
@@ -206,10 +206,8 @@ if (Meteor.isClient) {
     Tracker.flush({_throwFirstError: true});
     test.equal(getInnerHtml(div), '<span>AAA</span>');
 
-    {
-      let comp2 = ReactDOM.render(<Foo n={1}/>, div);
-      test.isTrue(comp === comp2);
-    }
+    const comp2 = ReactDOM.render(<Foo n={1} />, div);
+    test.isTrue(comp === comp2);
 
     test.equal(getInnerHtml(div), '<span>bbb</span>');
     xs[1].set('BBB');
@@ -296,6 +294,7 @@ if (Meteor.isClient) {
       self.num = new ReactiveVar(1);
       self.someOtherVar = new ReactiveVar('foo');
       self.Foo = () => {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
         const data = useTracker(() => {
           self.handle =
             Meteor.subscribe("useTracker-mixin-sub",
