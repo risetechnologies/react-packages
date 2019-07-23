@@ -1,0 +1,35 @@
+{
+  "plugins": ["babel", "react-hooks", "prettier"],
+  "env": {
+    "browser": true
+  },
+  "extends": [
+    "airbnb",
+    "prettier",
+    "prettier/react",
+    "prettier/babel",
+    "plugin:eslint-comments/recommended"
+  ],
+  "parser": "babel-eslint",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "ecmaVersion": 6,
+      "jsx": true
+    }
+  },
+  "rules": {
+    "no-plusplus": [2, { "allowForLoopAfterthoughts": true }],
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": [
+      "error",
+      { "additionalHooks": "useTracker" }
+    ],
+    "eslint-comments/no-unused-disable": "error",
+    "eslint-comments/disable-enable-pair": [
+      "error",
+      { "allowWholeFile": true }
+    ],
+    "no-console": "error",
+    "no-underscore-dangle": "off"
+  }
+}
