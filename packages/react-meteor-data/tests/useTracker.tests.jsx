@@ -1,3 +1,4 @@
+/* eslint-disable react/no-render-return-value */
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { renderHook, act } from '@testing-library/react-hooks';
@@ -238,6 +239,7 @@ if (Meteor.isClient) {
     ];
 
     let setState;
+    // eslint-disable-next-line react/prop-types
     const Foo = ({ n }) => {
       const [state, _setState] = useState({ m: 0 });
       setState = _setState;
@@ -290,6 +292,7 @@ if (Meteor.isClient) {
       ];
 
       let setState;
+      // eslint-disable-next-line react/prop-types
       const Foo = ({ n }) => {
         const [state, _setState] = useState({ m: 0 });
         setState = _setState;
@@ -305,7 +308,7 @@ if (Meteor.isClient) {
 
       test.equal(getInnerHtml(div), '<span>aaa</span>');
       xs[0].set('AAA');
-      test.equal(getInnerHtml(div), '<span>AAA</span>');
+      test.equal(getInnerHtml(div), '<span>aaa</span>');
       Tracker.flush({ _throwFirstError: true });
       test.equal(getInnerHtml(div), '<span>AAA</span>');
 

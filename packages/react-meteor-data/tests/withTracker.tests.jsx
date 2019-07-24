@@ -1,3 +1,4 @@
+/* eslint-disable react/no-render-return-value */
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 /* eslint-disable import/no-unresolved */
@@ -142,15 +143,17 @@ if (Meteor.isClient) {
 
       let setState;
       const Foo = (props) => {
+        // eslint-disable-next-line react/prop-types
+        const { n } = props;
         const [state, _setState] = useState({ m: 0 });
         setState = _setState;
         const Component = withTrackerClient({
           getMeteorData() {
             return {
-              x: xs[state.m + props.n].get(),
+              x: xs[state.m + n].get(),
             };
           },
-          deps: [state.m, props.n],
+          deps: [state.m, n],
         })(({ x }) => {
           return <span>{x}</span>;
         });
