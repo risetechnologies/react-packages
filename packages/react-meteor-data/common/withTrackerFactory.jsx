@@ -6,7 +6,7 @@ const withTrackerFactory = (useHookFunction) => (options) => (Component) => {
   const { getMeteorData, pure = true, deps = null } = expandedOptions;
 
   const WithTracker = forwardRef((props, ref) => {
-    const data = useHookFunction(() => getMeteorData(props) || {}, deps);
+    const data = useHookFunction((handle) => getMeteorData(props, handle) || {}, deps);
     return <Component ref={ref} {...props} {...data} />;
   });
 
