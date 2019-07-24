@@ -143,19 +143,19 @@ export const useControlledTracker = (reactiveFn, deps) => {
   /*
   Status can be
   -1: stopped, computation is stopped, dep change won't create a new computation
-  0: paused, computation is stopped, dep change will create a new computation
+  0: paused, computation is stopped, dep change will create a new computation (which then will switch to 1, e.g. normal operation mode)
   1: running, computation is running, dep change will create a new computation
   */
   const handle = {
     status: () => refs.status,
     stop: () => {
-      if (refs.status >= 0) {
+      if (refs.status <= 1) {
         refs.status = -1;
         dispose();
       }
     },
     pause: () => {
-      if (refs.status === 1) {
+      if (refs.status <= 1) {
         refs.status = 0;
         dispose();
       }
@@ -195,6 +195,7 @@ export const useControlledTracker = (reactiveFn, deps) => {
         };
 
         if (c.firstRun) {
+          refs.status = 1;
           // This will capture data synchronously on first run (and after deps change).
           // Additional cycles will follow the normal computation behavior.
           runReactiveFn();
