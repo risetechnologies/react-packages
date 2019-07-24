@@ -2,7 +2,7 @@
 Package.describe({
   name: 'risetechnologies:react-meteor-data',
   summary: 'React higher-order component for reactively tracking Meteor data',
-  version: '1.0.0',
+  version: '1.0.1',
   documentation: 'README.md',
   git: 'https://github.com/risetechnologies/react-packages',
 });
