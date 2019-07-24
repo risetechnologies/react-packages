@@ -1,5 +1,5 @@
 /* global Meteor, Package, Tracker */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useReducer, useEffect, useRef } from 'react';
 
 // Use React.warn() if available (should ship in React 16.9).
 const warn = React.warn || console.warn.bind(console);
@@ -46,13 +46,7 @@ function areHookInputsEqual(nextDeps, prevDeps) {
     return false;
   }
 
-  if (!Array.isArray(nextDeps)) {
-    if (Meteor.isDevelopment) {
-      warn(
-        'Warning: useTracker expected an dependency value of '
-        + `type array but got type of ${typeof nextDeps} instead.`
-      );
-    }
+  if (nextDeps === null || nextDeps === undefined || !Array.isArray(nextDeps)) {
     return false;
   }
 
@@ -71,14 +65,20 @@ function areHookInputsEqual(nextDeps, prevDeps) {
   return true;
 }
 
-let uniqueCounter = 0;
+// Used to create a forceUpdate from useReducer. Forces update by
+// incrementing a number whenever the dispatch method is invoked.
+const fur = x => x + 1;
 
-function useTracker(reactiveFn, deps) {
+function useTracker(reactiveFn, deps, computationHandler) {
   const { current: refs } = useRef({});
 
-  const [, forceUpdate] = useState();
+  const [, forceUpdate] = useReducer(fur, 0);
 
   const dispose = () => {
+    if (refs.computationCleanup) {
+      refs.computationCleanup();
+      delete refs.computationCleanup;
+    }
     if (refs.computation) {
       refs.computation.stop();
       refs.computation = null;
@@ -96,58 +96,82 @@ function useTracker(reactiveFn, deps) {
     // store the deps for comparison on next render
     refs.previousDeps = deps;
 
-    // Use Tracker.nonreactive in case we are inside a Tracker Computation.
-    // This can happen if someone calls `ReactDOM.render` inside a Computation.
-    // In that case, we want to opt out of the normal behavior of nested
-    // Computations, where if the outer one is invalidated or stopped,
-    // it stops the inner one.
-    refs.computation = Tracker.nonreactive(() => (
-      Tracker.autorun((c) => {
-        const runReactiveFn = () => {
-          const data = reactiveFn();
-          if (Meteor.isDevelopment) checkCursor(data);
-          refs.trackerData = data;
-        };
+    const tracked = (c) => {
+      const runReactiveFn = () => {
+        const data = reactiveFn();
+        if (Meteor.isDevelopment) checkCursor(data);
+        refs.trackerData = data;
+      };
 
-        if (c.firstRun) {
-          // This will capture data synchronously on first run (and after deps change).
-          // Additional cycles will follow the normal computation behavior.
-          runReactiveFn();
-        } else {
-          // If deps are falsy, stop computation and let next render handle reactiveFn.
-          if (!refs.previousDeps) {
-            dispose();
-          } else {
-            runReactiveFn();
+      if (c === null || c.firstRun) {
+        // If there is a computationHandler, pass it the computation, and store the
+        // result, which may be a cleanup method.
+        if (computationHandler) {
+          const cleanupHandler = computationHandler(c);
+          if (cleanupHandler) {
+            if (Meteor.isDevelopment && typeof cleanupHandler !== 'function') {
+              warn(
+                'Warning: Computation handler should return a function '
+                + 'to be used for cleanup or return nothing.'
+              );
+            }
+            refs.computationCleanup = cleanupHandler;
           }
-          // use a uniqueCounter to trigger a state change to force a re-render
-          forceUpdate(++uniqueCounter);
         }
-      })
-    ));
-  }
-
-  // stop the computation on unmount only
-  useEffect(() => {
-    if (Meteor.isDevelopment
-      && deps !== null && deps !== undefined
-      && !Array.isArray(deps)) {
-      warn(
-        'Warning: useTracker expected an initial dependency value of '
-        + `type array but got type of ${typeof deps} instead.`
-      );
+        // This will capture data synchronously on first run (and after deps change).
+        // Additional cycles will follow the normal computation behavior.
+        runReactiveFn();
+      } else {
+        // If deps are anything other than an array, stop computation and let next render handle reactiveFn.
+        if (deps === null || deps === undefined || !Array.isArray(deps)) {
+          dispose();
+        } else {
+          runReactiveFn();
+        }
+        forceUpdate();
+      }
     }
 
-    return dispose;
-  }, []);
+    // When rendering on the server, we don't want to use the Tracker.
+    if (Meteor.isServer) {
+      refs.computation = null;
+      tracked(null);
+    } else {
+      // Use Tracker.nonreactive in case we are inside a Tracker Computation.
+      // This can happen if someone calls `ReactDOM.render` inside a Computation.
+      // In that case, we want to opt out of the normal behavior of nested
+      // Computations, where if the outer one is invalidated or stopped,
+      // it stops the inner one.
+      refs.computation = Tracker.nonreactive(() => Tracker.autorun(tracked));
+    }
+  }
+
+  // stop the computation on unmount
+  useEffect(() => dispose, []);
 
   return refs.trackerData;
 }
 
-// When rendering on the server, we don't want to use the Tracker.
-// We only do the first rendering on the server so we can get the data right away
-function useTrackerServer(reactiveFn) {
-  return reactiveFn();
-}
-
-export default (Meteor.isServer ? useTrackerServer : useTracker);
+export default Meteor.isDevelopment
+  ? (reactiveFn, deps, computationHandler) => {
+    if (typeof reactiveFn !== 'function') {
+      warn(
+        `Warning: useTracker expected a function in it's first argument `
+        + `(reactiveFn), but got type of ${typeof reactiveFn}.`
+      );
+    }
+    if (deps && !Array.isArray(deps)) {
+      warn(
+        `Warning: useTracker expected an array in it's second argument `
+        + `(dependency), but got type of ${typeof deps}.`
+      );
+    }
+    if (computationHandler && typeof computationHandler !== 'function') {
+      warn(
+        `Warning: useTracker expected a function in it's third argument`
+        + `(computationHandler), but got type of ${typeof computationHandler}.`
+      );
+    }
+    return useTracker(reactiveFn, deps, computationHandler);
+  }
+  : useTracker;
