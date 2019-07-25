@@ -103,7 +103,7 @@ function areHookInputsEqual(nextDeps, prevDeps) {
     if (Meteor.isDevelopment && !areDepsValid(nextDeps)) {
       warn(
         'Warning: useTracker expected an dependency value of ' +
-          `type array but got type of ${typeof nextDeps} instead.`
+          `type array, null or undefined but got type of ${typeof nextDeps} instead.`
       );
     }
     return false;
@@ -200,8 +200,8 @@ export const useControlledTracker = (reactiveFn, deps) => {
           // Additional cycles will follow the normal computation behavior.
           runReactiveFn();
         } else {
-          // If deps are falsy, stop computation and let next render handle reactiveFn.
-          if (!areDepsValid(deps)) {
+          // If deps are anything other than an array, stop computation and let next render handle reactiveFn.
+          if (deps === null || deps === undefined || !Array.isArray(deps)) {
             dispose();
           } else {
             runReactiveFn();
@@ -217,7 +217,7 @@ export const useControlledTracker = (reactiveFn, deps) => {
     if (Meteor.isDevelopment && !areDepsValid(deps)) {
       warn(
         'Warning: useTracker expected an initial dependency value of ' +
-          `type array but got type of ${typeof deps} instead.`
+          `type array, null or undefined but got type of ${typeof deps} instead.`
       );
     }
 
