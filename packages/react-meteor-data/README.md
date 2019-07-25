@@ -101,7 +101,6 @@ or alternatively an object with the following properties
 
 - `getMeteorData`: `reactiveFn`, like above,
 - `pure`: `boolean`. If `true` (default) the `HOC` is wrapped by `React.memo`
-- `deps`: An optional array of "dependencies" just like `deps` from `useTracker` (default: `null`)
 
 ```js
 import { withTracker } from 'meteor/react-meteor-data';
@@ -146,7 +145,6 @@ export default withTracker({
     };
   },
   pure: true,
-  deps: null,
 })(Foo);
 ```
 
