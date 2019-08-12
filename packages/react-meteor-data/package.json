@@ -1,9 +1,10 @@
 {
   "name": "react-meteor-data",
   "dependencies": {
-    "react": "16.8.6",
-    "react-dom": "16.8.6",
-    "react-test-renderer": "16.8.6",
-    "@testing-library/react-hooks": "1.1.0"
+    "react": "16.9.0",
+    "react-dom": "16.9.0",
+    "react-test-renderer": "16.9.0",
+    "@testing-library/react": "^9.1.0",
+    "@testing-library/react-hooks": "2.0.1"
   }
 }
