@@ -32,6 +32,7 @@ It is not necessary to rewrite existing applications to use the `useTracker` hoo
 The `reactive function` will always run inside a `Tracker computation`, in some cases it might make sense to be able to control computation and/or the hooks itself.
 
 - `TrackerHandle` is an object with the following properties
+ - `computation()`: will return the current `Tracker` computation
  - `status()`: will return `-1` (stopped), `0` (paused) or `1` (running)
  - `stop()`: stops the computation and prevents resuming on dep changes. Does nothing if the status is already `-1`.
  - `pause()`: stops the computation but a dep change will recreate the computation (once this happens the operation mode switches back to `1` e.g. it will run normally). Does nothing if the status is already `0`.
@@ -44,7 +45,7 @@ The `TrackerHandle` will be passed to every `reactiveFn`.
 You can use the `useTracker` hook to get the value of a Tracker reactive function in your (function) components. The reactive function will get re-run whenever its reactive inputs change, and the component will re-render with the new value.
 
 Arguments:
-- `reactiveFn`: A Tracker reactive function (with `TrackerHandle`).
+- `reactiveFn`: A Tracker reactive function (receives the current computation).
 - `deps`: An optional array of "dependencies" of the reactive function. This is very similar to how the `deps` argument for [React's built-in `useEffect`, `useCallback` or `useMemo` hooks](https://reactjs.org/docs/hooks-reference.html) work. If omitted, the Tracker computation will be recreated on every render (Note: `withTracker` has always done this). If provided, the computation will be retained, and reactive updates after the first run will run asynchronously from the react render cycle. This array typically includes all variables from the outer scope "captured" in the closure passed as the 1st argument. For example, the value of a prop used in a subscription or a Minimongo query; see example below.
 
 ```js
@@ -95,7 +96,7 @@ function Foo({ listId }) {
 You can use the `withTracker` HOC to wrap your components and pass them additional props values from a Tracker reactive function. The reactive function will get re-run whenever its reactive inputs change, and the wrapped component will re-render with the new values for the additional props.
 
 Arguments:
-- `reactiveFn`: a Tracker reactive function, getting the props as a parameter and the `tracker handle` as the second argument. It must always return an object of additional props to pass to the wrapped component.
+- `reactiveFn`: a Tracker reactive function, getting the props as a parameter, and returning an object of additional props to pass to the wrapped component.
 
 or alternatively an object with the following properties
 
@@ -152,13 +153,22 @@ The returned component will, when rendered, render `Foo` (the "lower-order" comp
 
 For more information, see the [React article](http://guide.meteor.com/react.html) in the Meteor Guide.
 
+### Concurrent Mode, Suspense and Error Boundaries
+
+There are some additional considerations to keep in mind when using Concurrent Mode, Suspense and Error Boundaries, as each of these can cause React to cancel and discard (toss) a render, including the result of the first run of your reactive function. One of the things React developers often stress is that we should not create "side-effects" directly in the render method or in functional components. There are a number of good reasons for this, including allowing the React runtime to cancel renders. Limiting the use of side-effects allows features such as concurrent mode, suspense and error boundaries to work deterministically, without leaking memory or creating rogue processes. Care should be taken to avoid side effects in your reactive function for these reasons. (Note: this caution does not apply to Meteor specific side-effects like subscriptions, since those will be automatically cleaned up when `useTracker`'s computation is disposed.)
+
+Ideally, side-effects such as creating a Meteor computation would be done in `useEffect`. However, this is problematic for Meteor, which mixes an initial data query with setting up the computation to watch those data sources all in one initial run. If we wait to do that in `useEffect`, we'll end up rendering a minimum of 2 times (and using hacks for the first one) for every component which uses `useTracker` or `withTracker`, or not running at all in the initial render and still requiring a minimum of 2 renders, and complicating the API.
+
+To work around this and keep things running fast, we are creating the computation in the render method directly, and doing a number of checks later in `useEffect` to make sure we keep that computation fresh and everything up to date, while also making sure to clean things up if we detect the render has been tossed. For the most part, this should all be transparent.
+
+The important thing to understand is that your reactive function can be initially called more than once for a single render, because sometimes the work will be tossed. Additionally, `useTracker` will not call your reactive function reactively until the render is committed (until `useEffect` runs). If you have a particularly fast changing data source, this is worth understanding. With this very short possible suspension, there are checks in place to make sure the eventual result is always up to date with the current state of the reactive function. Once the render is "committed", and the component mounted, the computation is kept running, and everything will run as expected.
+
 ### Version compatibility notes
 
 - `react-meteor-data` v2.x :
   - `useTracker` hook + `withTracker` HOC
   - Requires React `^16.8`.
-  - Implementation is **NOT** compatible with the forthcoming "React Suspense" features.
-    - While the API *might* stay the same, React Suspense will result in thrown away render calls, since `useTracker` is written synchronously with the render phase (which is in fact an effect happening an render call which is strictly discouraged by React) several problems will occur. Since React Suspense has no final API a decision on how a compatible version will look like has been postponed. The main goal of version 2.0 is to stay 100% backward compatible.
+  - Implementation is compatible with "React Suspense", concurrent mode and error boundaries.
   - The `withTracker` HOC is strictly backwards-compatible with the one provided in v1.x, the major version number is only motivated by the bump of React version requirement. Provided a compatible React version, existing Meteor apps leveraging the `withTracker` HOC can freely upgrade from v1.x to v2.x, and gain compatibility with future React versions.
   - The previously deprecated `createContainer` has been removed.
 

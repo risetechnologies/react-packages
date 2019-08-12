@@ -30,6 +30,7 @@
       { "allowWholeFile": true }
     ],
     "no-console": "error",
-    "no-underscore-dangle": "off"
+    "no-underscore-dangle": "off",
+    "eslint-comments/no-unlimited-disable": "off"
   }
 }
