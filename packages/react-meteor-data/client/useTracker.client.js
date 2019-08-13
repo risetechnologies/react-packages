@@ -10,7 +10,11 @@ import { Meteor } from 'meteor/meteor';
 const warn = React.warn || console.warn.bind(console);
 
 let defaultTransform;
-let defaultIsEqual;
+// taken from https://github.com/facebook/react/blob/
+// 34ce57ae751e0952fd12ab532a3e5694445897ea/packages/shared/objectIs.js
+let defaultIsEqual = (x, y) =>
+  // eslint-disable-next-line no-self-compare
+  (x === y && (x !== 0 || 1 / x === 1 / y)) || (x !== x && y !== y);
 
 export const setDefaultOptions = (options) => {
   if (options && options.transform) {
@@ -63,12 +67,6 @@ function checkCursor(data) {
     );
   }
 }
-
-// taken from https://github.com/facebook/react/blob/
-// 34ce57ae751e0952fd12ab532a3e5694445897ea/packages/shared/objectIs.js
-const is = (x, y) =>
-  // eslint-disable-next-line no-self-compare
-  (x === y && (x !== 0 || 1 / x === 1 / y)) || (x !== x && y !== y);
 
 // Used to create a forceUpdate from useReducer. Forces update by
 // incrementing a number whenever the dispatch method is invoked.
@@ -148,8 +146,8 @@ export const useControlledTracker = (
   */
   const { current: refs } = useRef({
     status: 1,
-    isEqual: (options && options.isEqual) || defaultIsEqual || is,
-    transform: (options && options.transform) || defaultTransform || undefined,
+    isEqual: (options && options.isEqual) || defaultIsEqual,
+    transform: (options && options.transform) || defaultTransform,
     handle: {
       computation: () => refs.computation,
       status: () => refs.status,
