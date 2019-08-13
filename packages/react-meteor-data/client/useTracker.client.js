@@ -92,7 +92,7 @@ const dispose = (refs) => {
 const runReactiveFn = (refs, func) => {
   let data = func(refs.handle);
   if (Meteor.isDevelopment) checkCursor(data);
-  if (refs.transform) data = refs.transform(data);
+  if (refs.transform) data = refs.transform(refs.trackerData, data);
   return data;
 };
 
@@ -169,11 +169,67 @@ export const useControlledTracker = (
         if (refs.status <= 1) {
           refs.status = 1;
           dispose(refs);
+          if (Array.isArray(deps)) {
+            refs.computation = Tracker.nonreactive(() =>
+              // eslint-disable-next-line no-use-before-define
+              Tracker.autorun(tracked)
+            );
+          }
           forceUpdate();
         }
       },
     },
   });
+
+  const tracked = (c) => {
+    if (c.firstRun) {
+      refs.status = 1;
+      // If there is a computationHandler, pass it the computation, and store the
+      // result, which may be a cleanup method.
+      if (computationHandler) {
+        const cleanupHandler = computationHandler(c);
+        if (cleanupHandler) {
+          if (Meteor.isDevelopment && typeof cleanupHandler !== 'function') {
+            warn(
+              'Warning: Computation handler should return a function ' +
+                'to be used for cleanup or return nothing.'
+            );
+          }
+          refs.computationCleanup = cleanupHandler;
+        }
+      }
+
+      // This will capture data synchronously on first run (and after deps change).
+      // Don't run if refs.isMounted === false. Do run if === undefined, because
+      // that's the first render.
+      if (refs.isMounted === false) return;
+
+      // If isMounted is undefined, we set it to false, to indicate first run is finished.
+      if (refs.isMounted === undefined) refs.isMounted = false;
+
+      refs.trackerData = runReactiveFn(refs, reactiveFn);
+    } else {
+      // If deps are anything other than an array, stop computation and let next render
+      // handle reactiveFn. These null and undefined checks are optimizations to avoid
+      // calling Array.isArray in these cases.
+      // eslint-disable-next-line no-lonely-if
+      if (deps === null || deps === undefined || !Array.isArray(deps)) {
+        dispose(refs);
+        forceUpdate();
+      } else if (refs.isMounted) {
+        // Only run the reactiveFn if the component is mounted.
+        const d = runReactiveFn(refs, reactiveFn);
+        const hasChanged = !refs.isEqual(refs.trackerData, d);
+        if (hasChanged) {
+          refs.trackerData = d;
+          forceUpdate();
+        }
+      } else {
+        // If not mounted, defer render until mounted.
+        refs.doDeferredRender = true;
+      }
+    }
+  };
 
   // We are abusing useMemo a little bit, using it for it's deps
   // compare, but not for it's memoization.
@@ -187,60 +243,7 @@ export const useControlledTracker = (
     // In that case, we want to opt out of the normal behavior of nested
     // Computations, where if the outer one is invalidated or stopped,
     // it stops the inner one.
-    refs.computation = Tracker.nonreactive(() =>
-      Tracker.autorun((c) => {
-        if (c.firstRun) {
-          refs.status = 1;
-          // If there is a computationHandler, pass it the computation, and store the
-          // result, which may be a cleanup method.
-          if (computationHandler) {
-            const cleanupHandler = computationHandler(c);
-            if (cleanupHandler) {
-              if (
-                Meteor.isDevelopment &&
-                typeof cleanupHandler !== 'function'
-              ) {
-                warn(
-                  'Warning: Computation handler should return a function ' +
-                    'to be used for cleanup or return nothing.'
-                );
-              }
-              refs.computationCleanup = cleanupHandler;
-            }
-          }
-
-          // This will capture data synchronously on first run (and after deps change).
-          // Don't run if refs.isMounted === false. Do run if === undefined, because
-          // that's the first render.
-          if (refs.isMounted === false) return;
-
-          // If isMounted is undefined, we set it to false, to indicate first run is finished.
-          if (refs.isMounted === undefined) refs.isMounted = false;
-
-          refs.trackerData = runReactiveFn(refs, reactiveFn);
-        } else {
-          // If deps are anything other than an array, stop computation and let next render
-          // handle reactiveFn. These null and undefined checks are optimizations to avoid
-          // calling Array.isArray in these cases.
-          // eslint-disable-next-line no-lonely-if
-          if (deps === null || deps === undefined || !Array.isArray(deps)) {
-            dispose(refs);
-            forceUpdate();
-          } else if (refs.isMounted) {
-            // Only run the reactiveFn if the component is mounted.
-            const d = runReactiveFn(refs, reactiveFn);
-            const hasChanged = !refs.isEqual(refs.trackerData, d);
-            if (hasChanged) {
-              refs.trackerData = d;
-              forceUpdate();
-            }
-          } else {
-            // If not mounted, defer render until mounted.
-            refs.doDeferredRender = true;
-          }
-        }
-      })
-    );
+    refs.computation = Tracker.nonreactive(() => Tracker.autorun(tracked));
 
     // We are creating a side effect in render, which can be problematic in some cases, such as
     // Suspense or concurrent rendering or if an error is thrown and handled by an error boundary.
@@ -248,13 +251,14 @@ export const useControlledTracker = (
     // possible memory/resource leaks by setting a time out to automatically clean everything up,
     // and watching a set of references to make sure everything is choreographed correctly.
     if (!refs.isMounted) {
-      // Functional components yield to allow the browser to paint before useEffect is run, so we
-      // set a 50ms timeout to allow for that.
+      // Components yield to allow the DOM to update and the browser to paint before useEffect
+      // is run. In concurrent mode this can take quite a long time, so we set a 1000ms timeout
+      // to allow for that.
       refs.disposeId = setTimeout(() => {
         if (!refs.isMounted) {
           dispose(refs);
         }
-      }, 50);
+      }, 1000);
     }
   }, deps); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -265,7 +269,9 @@ export const useControlledTracker = (
     clearTimeout(refs.disposeId);
     delete refs.disposeId;
 
-    // We may have a queued render from a reactive update which happened before useEffect.
+    // If it took longer than 1000ms to get to useEffect, we might need to restart the
+    // computation. Alternatively, we might have a queued render from a reactive update
+    // which happened before useEffect.
     if (refs.doDeferredRender) {
       delete refs.doDeferredRender;
 
