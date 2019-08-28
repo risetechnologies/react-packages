@@ -1,5 +1,8 @@
 {
   "name": "react-meteor-data",
+  "scripts": {
+    "test": "ROOT_URL=http://localhost meteor test-packages ./"
+  },
   "dependencies": {
     "react": "16.9.0",
     "react-dom": "16.9.0",
