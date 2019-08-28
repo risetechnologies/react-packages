@@ -94,6 +94,14 @@ const runReactiveFn = (refs, func) => {
   return data;
 };
 
+const clear = (refs) => {
+  if (refs.disposeId) {
+    clearTimeout(refs.disposeId);
+    // eslint-disable-next-line no-param-reassign
+    delete refs.disposeId;
+  }
+};
+
 export const useControlledTracker = (
   reactiveFn,
   deps,
@@ -197,14 +205,6 @@ export const useControlledTracker = (
         }
       }
 
-      // This will capture data synchronously on first run (and after deps change).
-      // Don't run if refs.isMounted === false. Do run if === undefined, because
-      // that's the first render.
-      if (refs.isMounted === false) return;
-
-      // If isMounted is undefined, we set it to false, to indicate first run is finished.
-      if (refs.isMounted === undefined) refs.isMounted = false;
-
       refs.trackerData = runReactiveFn(refs, reactiveFn);
     } else {
       // If deps are anything other than an array, stop computation and let next render
@@ -223,8 +223,16 @@ export const useControlledTracker = (
           forceUpdate();
         }
       } else {
-        // If not mounted, defer render until mounted.
-        refs.doDeferredRender = true;
+        // If we got here, then a reactive update happened before the render was
+        // committed - before useEffect has run. We don't want to run the reactiveFn
+        // while we are not sure this render will be committed, so we'll dispose of the
+        // computation, and set everything up to be restarted in useEffect if needed.
+        // NOTE: If we don't run the user's reactiveFn when a computation updates, we'll
+        // leave the computation in a non-reactive state - so we'll dispose here and let
+        // the useEffect hook recreate the computation later.
+        dispose(refs);
+        // Might as well clear the timeout!
+        clear(refs);
       }
     }
   };
@@ -264,19 +272,25 @@ export const useControlledTracker = (
     // Now that we are mounted, we can set the flag, and cancel the timeout
     refs.isMounted = true;
 
-    clearTimeout(refs.disposeId);
-    delete refs.disposeId;
+    // We are committed, clear the dispose timeout
+    clear(refs);
 
-    // If it took longer than 1000ms to get to useEffect, we might need to restart the
-    // computation. Alternatively, we might have a queued render from a reactive update
-    // which happened before useEffect.
-    if (refs.doDeferredRender) {
-      delete refs.doDeferredRender;
-
-      const d = runReactiveFn(refs, reactiveFn);
-      const hasChanged = !refs.isEqual(refs.trackerData, d);
-      refs.trackerData = d;
-      if (hasChanged) forceUpdate();
+    // If it took longer than 1000ms to get to useEffect, or a reactive update happened
+    // before useEffect, we will need to forceUpdate, and restart the computation.
+    if (!refs.computation) {
+      // If we have deps, we need to set up a new computation before forcing update.
+      // If we have NO deps, it'll be recreated and rerun on the next render.
+      if (Array.isArray(deps)) {
+        // This also runs runReactiveFn
+        const d = runReactiveFn(refs, reactiveFn);
+        const hasChanged = !refs.isEqual(refs.trackerData, d);
+        if (hasChanged) {
+          refs.trackerData = d;
+          forceUpdate();
+        }
+      } else {
+        forceUpdate();
+      }
     }
 
     // stop the computation on unmount
